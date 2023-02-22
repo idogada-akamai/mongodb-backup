@@ -33,7 +33,7 @@ function download_snapshot() {
 
     # Download the snapshot
     local download_url=$(atlas backup restore describe --clusterName $cluster_name $restore_job_id -o json | jq -r '.deliveryUrl[0]')
-    snapshot_file_name=${download_url##*/}
+    snapshot_file_name=${download_url##*/} # From the beginning of the string, remove until the first '/'
     wget -c $download_url -O /tmp/$snapshot_file_name
 
 }
