@@ -1,10 +1,11 @@
 import logging
 import subprocess
 import tempfile
-from typing import List
-from rclone.rclone_config.storage_system import StorageSystem
-from rclone.rclone_config.rclone_config import RcloneConfig
 from configparser import ConfigParser
+from typing import List
+
+from rclone.rclone_config.rclone_config import RcloneConfig
+from rclone.rclone_config.storage_system import StorageSystem
 
 
 class RClone:
@@ -19,8 +20,10 @@ class RClone:
 
         self.log = logging.getLogger("RClone")
 
-    def __init__(self, remotes: List[StorageSystem]) -> None:
+    def __init__(self, *remotes: List[StorageSystem]) -> None:
         self.cfg = RcloneConfig(remotes)
+
+        self.log = logging.getLogger("RClone")
 
     def _execute(self, command_with_args):
         """
@@ -33,18 +36,18 @@ class RClone:
         self.log.debug("Invoking : %s", " ".join(command_with_args))
         try:
             with subprocess.Popen(
-                command_with_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                command_with_args,
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+                stderr=subprocess.PIPE,
             ) as proc:
-                (out, err) = proc.communicate()
+                yield from iter(proc.stdout.readline, "")
+                proc.stdout.close()
+                if return_code := proc.wait():
+                    raise subprocess.CalledProcessError(
+                        return_code, command_with_args, proc.stdout, proc.stderr
+                    )
 
-                # out = proc.stdout.read()
-                # err = proc.stderr.read()
-
-                self.log.debug(out)
-                if err:
-                    self.log.warning(err.decode("utf-8").replace("\\n", "\n"))
-
-                return {"code": proc.returncode, "out": out, "error": err}
         except FileNotFoundError as not_found_e:
             self.log.error("Executable not found. %s", not_found_e)
             return {"code": -20, "error": not_found_e}
@@ -70,9 +73,8 @@ class RClone:
 
             command_with_args = ["rclone", command, "--config", cfg_file.name]
             command_with_args += extra_args
-            command_result = self._execute(command_with_args)
-            cfg_file.close()
-            return command_result
+            self.log.info(f"Executing command {command_with_args}")
+            [print(output) for output in self._execute(command_with_args)]
 
     def copy(self, source, dest, flags=None):
         """
