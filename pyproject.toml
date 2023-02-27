@@ -9,10 +9,12 @@ packages = []
 [tool.poetry.dependencies]
 python = "^3.10"
 boto3 = "^1.26.48"
+atlasapi = "^2.0.7"
 
 
 [tool.poetry.group.dev.dependencies]
 black = {version = "^23.1a1", allow-prereleases = true}
+debugpy = "^1.6.6"
 
 [build-system]
 requires = ["poetry-core"]

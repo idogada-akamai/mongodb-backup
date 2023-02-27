@@ -1,4 +1,4 @@
-FROM python:3.11.1-alpine3.17 AS python-build
+FROM python:3.11.1-alpine3.17 AS poetry
 
 ENV POETRY_VERSION=1.3.0 \
     PYTHONFAULTHANDLER=1 \
@@ -6,6 +6,8 @@ ENV POETRY_VERSION=1.3.0 \
     PYTHONUNBUFFERED=1
 
 RUN python -m pip install poetry==$POETRY_VERSION
+
+FROM poetry AS dependency-install
 
 WORKDIR /app
 RUN python -m venv /app/venv
@@ -28,7 +30,7 @@ RUN wget -O rclone.zip https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v$
     mv rclone-v${RCLONE_VERSION}-linux-amd64/rclone /usr/local/bin
 
 ## Beginning of runtime image
-FROM  python:3.11.1-alpine3.17 as runtime
+FROM poetry as runtime
 
 # Keeps Python from generating .pyc files in the container
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -39,7 +41,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PATH /app/venv/bin:$PATH
 
 COPY --from=download-rclone /usr/local/bin/rclone /usr/local/bin/rclone
-COPY --from=python-build /app/venv /app/venv/
+COPY --from=dependency-install /app/venv /app/venv/
 
 RUN apk add --update bash
 
