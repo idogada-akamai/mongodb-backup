@@ -16,14 +16,16 @@ ARG POETRY_OPTIONS
 RUN . /app/venv/bin/activate \
     && poetry install $POETRY_OPTIONS
 
-# Atlas CLI installation
-FROM alpine:3.17.1 AS atlas
-ENV ATLAS_CLI_VERSION=1.4.0
+FROM alpine:3.17.2 as download-rclone
+
+ENV RCLONE_VERSION=1.61.1
 RUN apk update && \
-    apk add wget tar && \
-    tarball_name="mongodb-atlas-cli_${ATLAS_CLI_VERSION}_linux_x86_64" && \
-    wget -c https://fastdl.mongodb.org/mongocli/$tarball_name.tar.gz -O - | tar -xz -C /tmp && \
-    mv /tmp/$tarball_name/bin/atlas /tmp 
+    apk add wget unzip
+
+WORKDIR /tmp
+RUN wget -O rclone.zip https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-amd64.zip && \
+    unzip rclone.zip && \
+    mv rclone-v${RCLONE_VERSION}-linux-amd64/rclone /usr/local/bin
 
 ## Beginning of runtime image
 FROM  python:3.11.1-alpine3.17 as runtime
@@ -36,14 +38,12 @@ ENV PYTHONUNBUFFERED=1
 
 ENV PATH /app/venv/bin:$PATH
 
-COPY --from=atlas /tmp/atlas /usr/local/bin
+COPY --from=download-rclone /usr/local/bin/rclone /usr/local/bin/rclone
 COPY --from=python-build /app/venv /app/venv/
 
-RUN apk update && apk add wget jq bash
+RUN apk add --update bash
 
 WORKDIR /app
-COPY backup.sh /app/
-RUN chmod +x /app/backup.sh
-COPY upload_to_s3.py /app/
+COPY . .
 
-ENTRYPOINT ["/app/backup.sh"]
+ENTRYPOINT ["python", "backup.py"]
